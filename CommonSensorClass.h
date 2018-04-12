@@ -62,6 +62,15 @@
 
 #define COMMONSENSORCLASS_VERSION 100
 
+// CSC is short for COMMONSENSORCLASS
+// Bit definitions for the descriptor.
+#define CSC_REGISTER_ADDRESS_0   0               // The sensor has no register address
+#define CSC_REGISTER_ADDRESS_1   1               // The sensor register address is one byte
+#define CSC_REGISTER_ADDRESS_2   2               // The sensor register address is two bytes
+#define CSC_REPEATED_START       0x00000010      // The sensor requires/supports a repeated start
+#define CSC_24BIT                0x00000020      // The sensor has 24-bit data.
+
+
 class CommonSensorClass
 {
 public:
