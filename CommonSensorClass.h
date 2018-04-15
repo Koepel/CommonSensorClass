@@ -274,7 +274,7 @@ public:
               {
                 // MSB first, this is normal
                 data3x8 = uint32_t( Wire.read()) << 16;
-                data3x8 = uint32_t( Wire.read()) << 8;
+                data3x8 |= uint32_t( Wire.read()) << 8;
                 data3x8 |= Wire.read();
               }
               else
@@ -296,8 +296,8 @@ public:
               {
                 // MSB first, this is normal
                 data32 = uint32_t( Wire.read()) << 24;
-                data32 = uint32_t( Wire.read()) << 16;
-                data32 = uint32_t( Wire.read()) << 8;
+                data32 |= uint32_t( Wire.read()) << 16;
+                data32 |= uint32_t( Wire.read()) << 8;
                 data32 |= Wire.read();
               }
               else
