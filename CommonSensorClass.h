@@ -10,11 +10,16 @@
 // Consider version 1.00 as Quick and Dirty.
 // Licence: Public Domain / At your own risk
 //
+// Version 1.01   2018 april 15   by Koepel
+// Still an experimental version.
+// A sensor with 24 bit data might not work.
+// Instead of (too) many parameters with .begin(), a descriptor with 32 bits is used.
+//
 //
 //
 // Other existing libraries for a common class.
 // ---------------------------------------------------------------------------------
-//    I tried really hard, but I could not find an existing library like this one.
+//    I could not find an existing library like this one.
 //    Other common sensor libraries are more specific.
 //    This library is not specific, but still supports auto MSB-LSB order for variables.
 //
@@ -29,16 +34,12 @@
 //
 // List of reachable and unreachable goals:
 // ----------------------------------------
-//    Be able to select an other (software) Wire library.
-//
-//    The put() function has a baseSize parameter. Is it possible
-//    to do that automatically ?
+//    Be able to select other (software) Wire libraries.
 //
 //    Allow more than 32 bytes for the AVR microcontrollers 
 //    by using multiple I2C transactions.
 //
-//    Add callback functions. This is usefull when someday there will be
-//    a better non-blocking I2C library for faster processors and multitasking.
+//    Add callback functions for non-blocking I2C libraries.
 //
 //    Add the possibility of a delay or timeout or poll the sensor for sensors 
 //    that require some time for a new sample.
@@ -46,11 +47,6 @@
 //    Make Slave code that works well with this class.
 //
 //    Support other busses (SPI, 1-Wire, Serial).
-//
-//    Make it more advanced by writing a struct/class for a sensor that
-//    automatically updates the data with the sensor when something
-//    is read or written to/from the struct/class. This is possible in C++,
-//    but is it useful ?
 //
 //    
 
@@ -60,16 +56,16 @@
 #include <Wire.h>
 
 
-#define COMMONSENSORCLASS_VERSION 100
+#define COMMONSENSORCLASS_VERSION 101
 
 // CSC is short for COMMONSENSORCLASS
-// Bit definitions for the descriptor.
-#define CSC_REGISTER_ADDRESS_0   0               // The sensor has no register address.
-#define CSC_REGISTER_ADDRESS_1   1               // The sensor register address is one byte.
-#define CSC_REGISTER_ADDRESS_2   2               // The sensor register address is two bytes.
-#define CSC_REPEATED_START       0x00000010      // The sensor requires/supports a repeated start.
-#define CSC_24BIT                0x00000020      // The sensor has 24-bit data.
-#define CSC_SENSOR_LSB_FIRST     0x00000040      // The sensor has the data as LSB first.
+// A value of zero is defined as not being initialized yet.
+#define CSC_NO_REGISTER_ADDRESS       0x00000001  // The sensor has no register address.
+#define CSC_REGISTER_ADDRESS_SIZE_1   0x00000002  // The sensor register address is one byte.
+#define CSC_REGISTER_ADDRESS_SIZE_2   0x00000004  // The sensor register address is two bytes.
+#define CSC_REPEATED_START            0x00000010  // The sensor requires/supports a repeated start.
+#define CSC_24BIT                     0x00000020  // The sensor has 24-bit data.
+#define CSC_SENSOR_LSB_FIRST          0x00000040  // The sensor has the register address and data as LSB first.
 
 
 class CommonSensorClass
@@ -79,7 +75,7 @@ public:
   // Declaring the object. It does not change anything to the pins for I2C.
   CommonSensorClass()
   {
-    _data_initialized = false;
+    _descriptor = 0;
   }
   
   ~CommonSensorClass()
@@ -90,16 +86,12 @@ public:
   // From now on the pins are claimed for the I2C bus.
   void begin(
     int deviceAddress,             // The 7-bit I2C address of the sensor.
-    int registerAddressSize = 1,   // The size of the register pointer, 0, 1, or 2.
-    bool repeatedStart = false)    // Is a repeated start supported/required ? true or false.
+    uint32_t sensorDescriptor = CSC_REGISTER_ADDRESS_SIZE_1)  // A bitwise combination of the CSC defines.
   {
     Wire.begin();                  // Assuming it is allowed to call Wire.begin() multiple times.
   
     _device_address = (uint8_t) deviceAddress;
-    _register_address_size = (uint8_t) registerAddressSize;
-    _repeated_start = repeatedStart;
-
-    _data_initialized = true;
+    _descriptor = sensorDescriptor;
   }
 
 
@@ -107,7 +99,7 @@ public:
   void end()
   {
     Wire.end();
-    _data_initialized = false;
+    _descriptor = 0;
   }
 
 
@@ -118,9 +110,9 @@ public:
   // The function put() can be used in two ways:
   //    Either with a variable, then the size of the variable itself is used.
   //    Or when the variable is a single byte then the parameter 'size' is used for the bytes to transfer.
-  template <typename T> bool put( uint16_t registerAddress, const T &t, int size = 1, bool I2Cstop = true)
+  template <typename T> bool put( uint16_t registerAddress, const T &t, size_t size = 1, bool I2Cstop = true)
   {
-    if( !_data_initialized)                 // safety check if .begin() was not called.
+    if( _descriptor == 0)                         // safety check if .begin() was called.
     {
       return( false);
     }
@@ -128,16 +120,29 @@ public:
     const uint8_t *ptr = (const uint8_t*) &t;
   
     Wire.beginTransmission( _device_address);
-    
-    if( _register_address_size == 1)
+
+    if( (_descriptor & CSC_NO_REGISTER_ADDRESS) != 0)
+    {
+      // the sensor has no register address
+    }
+    else if( (_descriptor & CSC_REGISTER_ADDRESS_SIZE_1) != 0)
     {
       Wire.write( (uint8_t) registerAddress);
     }
-    else if( _register_address_size == 2)
+    else if( (_descriptor & CSC_REGISTER_ADDRESS_SIZE_2) != 0)
     {
-      // MSB is written first.
-      Wire.write( (uint8_t) (registerAddress >> 8));
-      Wire.write( (uint8_t) registerAddress);
+      if( (_descriptor & CSC_SENSOR_LSB_FIRST) != 0)
+      {
+        // Is there a sensor with the register address LSB first ?
+        Wire.write( (uint8_t) registerAddress);
+        Wire.write( (uint8_t) (registerAddress >> 8));
+      }
+      else
+      {
+        // MSB is written first for most sensors.
+        Wire.write( (uint8_t) (registerAddress >> 8));
+        Wire.write( (uint8_t) registerAddress);
+      }
     }
 
     if( size > 0)
@@ -154,7 +159,7 @@ public:
 
     uint8_t error = Wire.endTransmission( I2Cstop);     // send true for a stop, false for repeated start.
     
-    return( error == 0);              // return true if success, that means true of no error.
+    return( error == 0);              // return true if success, that means true if no error.
   }
 
 
@@ -181,9 +186,9 @@ public:
   //    The 'baseSize' is the number of bytes in the sensor that belong together.
   //    Or when the variable is a single byte then the parameter 'baseSize' is used 
   //    for the amount of bytes to transfer.
-  template <typename T> bool get( uint16_t registerAddress, T &t, int baseSize = 1)
+  template <typename T> bool get( uint16_t registerAddress, T &t, size_t size = 1)
   {
-    if( !_data_initialized)         // safety check if .begin() was not called.
+    if( _descriptor == 0)         // safety check if .begin() was not called.
     {
       return( false);
     }
@@ -191,11 +196,11 @@ public:
     uint8_t *ptr = (uint8_t *) &t;
     bool success = true;           // default true, make it false if something fails later on.
 
-    int stepSize = baseSize;
+    int stepSize = size;
     uint16_t totalSize = sizeof( T);
 
     // Test if the sensor has 3-byte values that needs to be stored in 4-bytes variables.
-    if( stepSize == 3 && totalSize > 3)
+    if( (_descriptor & CSC_24BIT != 0) && totalSize > 3)
     {
       stepSize = 4;
     }
@@ -203,14 +208,14 @@ public:
     if( totalSize == 1)
     {
       // The 'baseSize' was used as the number of bytes and data is a pointer
-      totalSize = baseSize;
+      totalSize = size;
       stepSize = 1;
-      baseSize = 1;
+      size = 1;
     }
 
     // Test if the sensor uses a register address.
     // Some sensors (like the BH1750) don't have a register address in the sensor.
-    if( _register_address_size > 0)
+    if( (_descriptor & CSC_NO_REGISTER_ADDRESS) != 0)
     {
       success = put( registerAddress, NULL, 0);
     }
@@ -235,7 +240,7 @@ public:
 
         for( unsigned int i=0; i<(totalSize / stepSize); i++)
         {
-          switch( baseSize)
+          switch( size)
           {
           case 0:
             break;
@@ -244,34 +249,67 @@ public:
             break;
           case 2:
             {                     // allow local variables with extra brackets
+              uint16_t data16 = 0;
+              if( (_descriptor & CSC_SENSOR_LSB_FIRST) == 0)
+              {
+                // MSB first, this is normal
+                data16 = uint16_t( Wire.read()) << 8;
+                data16 |= Wire.read();
+              }
+              else
+              {
+                // LSB first, this is not normal, but some sensors have LSB first.
+                data16 = Wire.read();
+                data16 |= uint16_t( Wire.read()) << 8;
+              }
               uint16_t *p = (uint16_t *) ptr;
-              *p = Wire.read();
-              *p <<= 8;
-              *p |= Wire.read();
+              *p = data16;
               ptr += 2;
             }
             break;
           case 3:
             {                     // allow local variables with extra brackets
+              uint32_t data3x8 = 0;
+              if( (_descriptor & CSC_SENSOR_LSB_FIRST) == 0)
+              {
+                // MSB first, this is normal
+                data3x8 = uint32_t( Wire.read()) << 16;
+                data3x8 = uint32_t( Wire.read()) << 8;
+                data3x8 |= Wire.read();
+              }
+              else
+              {
+                // LSB first, this is not normal, but some sensors have LSB first.
+                data3x8 = Wire.read();
+                data3x8 |= uint32_t( Wire.read()) << 8;
+                data3x8 |= uint32_t( Wire.read()) << 16;
+              }
               uint32_t *p = (uint32_t *) ptr;
-              *p = Wire.read();
-              *p <<= 8;
-              *p |= Wire.read();
-              *p <<= 8;
-              *p |= Wire.read();
+              *p = data3x8;
               ptr += 4;
             }
             break;
           case 4:
             {                     // allow local variables with extra brackets
+              uint32_t data32 = 0;
+              if( (_descriptor & CSC_SENSOR_LSB_FIRST) == 0)
+              {
+                // MSB first, this is normal
+                data32 = uint32_t( Wire.read()) << 24;
+                data32 = uint32_t( Wire.read()) << 16;
+                data32 = uint32_t( Wire.read()) << 8;
+                data32 |= Wire.read();
+              }
+              else
+              {
+                // LSB first, this is not normal, but some sensors have LSB first.
+                data32 = Wire.read();
+                data32 |= uint32_t( Wire.read()) << 8;
+                data32 |= uint32_t( Wire.read()) << 16;
+                data32 |= uint32_t( Wire.read()) << 24;
+              }
               uint32_t *p = (uint32_t *) ptr;
-              *p = Wire.read();
-              *p <<= 8;
-              *p |= Wire.read();
-              *p <<= 8;
-              *p |= Wire.read();
-              *p <<= 8;
-              *p |= Wire.read();
+              *p = data32;
               ptr += 4;
             }
             break;
@@ -293,7 +331,7 @@ public:
   {
     Wire.beginTransmission( _device_address);
     uint8_t error = Wire.endTransmission();
-    return( error == 0);
+    return( error == 0);              // if error is 0, then the sensor exists and this returns true.
   }
 
   // This function is called readByte(), to avoid confusion with Wire.read().
@@ -333,10 +371,8 @@ public:
 
 private:
   // This data describes the sensor.
-  uint8_t _device_address;            // The 7-bit I2C address of the sensor.
-  uint8_t _register_address_size;     // The size of the register pointer, 0, 1, or 2.
-  bool _repeated_start;               // True if the repeated start is supported/required.
-  bool _data_initialized;             // Tells if these variables are initialized.
+  uint8_t _device_address;            // The 7-bit I2C address of the sensor. Zero is allowed.
+  uint32_t _descriptor;               // Describes the sensor. Zero means not initialized yet.
 };
 
 #endif
