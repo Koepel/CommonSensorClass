@@ -147,7 +147,7 @@ public:
 
     if( size > 0)
     {
-      if( size > sizeof( T))
+      if( size > (int) sizeof( T))
       {
         Wire.write( ptr, (size_t) size);
       }
