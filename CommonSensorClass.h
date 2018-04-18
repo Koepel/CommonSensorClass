@@ -15,6 +15,10 @@
 // A sensor with 24 bit data might not work.
 // Instead of (too) many parameters with .begin(), a descriptor with 32 bits is used.
 //
+// Version 1.02   2018 april 18   by Koepel
+// Added overloading for an array as parameter.
+// Needs more testing.
+//
 //
 //
 // Other existing libraries for a common class.
@@ -56,7 +60,7 @@
 #include <Wire.h>
 
 
-#define COMMONSENSORCLASS_VERSION 101
+#define COMMONSENSORCLASS_VERSION 102
 
 // CSC is short for COMMONSENSORCLASS
 // A value of zero is defined as not being initialized yet.
@@ -110,7 +114,7 @@ public:
   // The function put() can be used in two ways:
   //    Either with a variable, then the size of the variable itself is used.
   //    Or when the variable is a single byte then the parameter 'size' is used for the bytes to transfer.
-  template <typename T> bool put( uint16_t registerAddress, const T &t, size_t size = 1, bool I2Cstop = true)
+  template <typename T> bool put( uint16_t registerAddress, const T (&t), size_t size = 1, bool I2Cstop = true)
   {
     if( _descriptor == 0)                         // safety check if .begin() was called.
     {
@@ -162,6 +166,12 @@ public:
     return( error == 0);              // return true if success, that means true if no error.
   }
 
+  template <typename T, size_t N> bool put( uint16_t registerAddress, const T (&t)[N])
+  {
+    size_t elementSize = sizeof( T) / N;
+    return( put( registerAddress, t, elementSize));
+  }
+  
 
   // The function get() returns a bool, because the only thing that is needed to know,
   // is whether the get() was successful or not.
@@ -186,7 +196,7 @@ public:
   //    The 'baseSize' is the number of bytes in the sensor that belong together.
   //    Or when the variable is a single byte then the parameter 'baseSize' is used 
   //    for the amount of bytes to transfer.
-  template <typename T> bool get( uint16_t registerAddress, T &t, size_t size = 1)
+  template <typename T> bool get( uint16_t registerAddress, T (&t), size_t size = 1)
   {
     if( _descriptor == 0)         // safety check if .begin() was not called.
     {
@@ -325,6 +335,14 @@ public:
     return( success);
   }
 
+  template <typename T, size_t N> bool get( uint16_t registerAddress, const T (&t)[N])
+  {
+    size_t elementSize = sizeof( T) / N;
+    return( get( registerAddress, t, elementSize));
+  }
+  
+  
+  
   // This function checks if the sensor responds, rather than really checking if it exists.
   // Some sensors are not resonding to the I2C bus when busy.
   bool exists()
