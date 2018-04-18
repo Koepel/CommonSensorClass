@@ -23,8 +23,8 @@ void loop()
   int16_t accel[3];
   int16_t gyro[3];
 
-  sensor.get( 0x3B, accel, 2);      // get 6 bytes total, with 2 bytes per value.
-  sensor.get( 0x43, gyro, 2);       // get 6 bytes total, with 2 bytes per value.
+  sensor.get( 0x3B, accel);      // get 6 bytes total, with 2 bytes per value.
+  sensor.get( 0x43, gyro);       // get 6 bytes total, with 2 bytes per value.
 
 
   SERIAL_PORT.print( "accel = ");
