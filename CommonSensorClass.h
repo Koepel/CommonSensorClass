@@ -19,29 +19,34 @@
 // Added overloading for an array as parameter.
 // Needs more testing.
 //
+// Version 1.03   2018 april 22   by Koepel
+// Added support for every Wire compatible I2C library.
+// Using a template with the class of the used Wire library is the best option,
+// but the creator in the sketch is more complex.
+// Added support for up to 255 bytes transfer.
+// Probably added a number of bugs as well. Not ready to be used yet.
+//
 //
 //
 // Other existing libraries for a common class.
 // ---------------------------------------------------------------------------------
 //    I could not find an existing library like this one.
 //    Other common sensor libraries are more specific.
-//    This library is not specific, but still supports auto MSB-LSB order for variables.
+//    This library is not specific and has auto MSB-LSB order for variables.
 //
 //
-// This library could provide a fast start to build upon.
-// ------------------------------------------------------
+// This library could provide a quick start to build upon.
+// -------------------------------------------------------
 //    Some sensors require extensive calculations, for example the BME280.
 //    That requires a dedicated library.
 //    This library can still be useful for such a dedicated library to provide
-//    a faster start to interface with the sensor.
+//    a quick start to interface with the sensor.
 //
 //
 // List of reachable and unreachable goals:
 // ----------------------------------------
-//    Be able to select other (software) Wire libraries.
-//
-//    Allow more than 32 bytes for the AVR microcontrollers 
-//    by using multiple I2C transactions.
+//    Detect if the standard Arduino Wire library is used, and then
+//    create the CommonSensorClass automatically ?
 //
 //    Add callback functions for non-blocking I2C libraries.
 //
@@ -57,10 +62,18 @@
 
 #include <inttypes.h>
 #include <Arduino.h>
-#include <Wire.h>
 
 
-#define COMMONSENSORCLASS_VERSION 102
+#define COMMONSENSORCLASS_VERSION 103
+
+
+// The buffer size of the used Wire library.
+// The size is 32 for the Arduino AVR microcontrollers.
+// It is less for the TinyWire and more for the Arduino SAMD processors.
+// This should be set automatically to the right value, 
+// but there is no way to get that number from the used Wire library.
+#define COMMONSENSORCLASS_WIRE_BUFFER_SIZE 32
+
 
 // CSC is short for COMMONSENSORCLASS
 // A value of zero is defined as not being initialized yet.
@@ -68,18 +81,22 @@
 #define CSC_REGISTER_ADDRESS_SIZE_1   0x00000002  // The sensor register address is one byte.
 #define CSC_REGISTER_ADDRESS_SIZE_2   0x00000004  // The sensor register address is two bytes.
 #define CSC_REPEATED_START            0x00000010  // The sensor requires/supports a repeated start.
-#define CSC_24BIT                     0x00000020  // The sensor has 24-bit data.
-#define CSC_SENSOR_LSB_FIRST          0x00000040  // The sensor has the register address and data as LSB first.
+#define CSC_24BIT_SIGNED              0x00000020  // The sensor has 24-bit signed data.
+#define CSC_24BIT_UNSIGNED            0x00000040  // The sensor has 24-bit unsigned data;
+#define CSC_SENSOR_LSB_FIRST          0x00000080  // The sensor has the register address and data as LSB first.
 
 
-class CommonSensorClass
+template <class T_WIRE_LIBRARY> class CommonSensorClass
 {
 public:
 
-  // Declaring the object. It does not change anything to the pins for I2C.
-  CommonSensorClass()
+  // Declaring the object. 
+  // It does not change anything to the pins for I2C yet.
+  // The constructure uses the object of the used Wire library.
+  // The "_WireLib" is the object stored in this template.
+  CommonSensorClass( T_WIRE_LIBRARY& WireLibrary): _WireLib( WireLibrary)
   {
-    _descriptor = 0;
+    _descriptor = 0;                 // reset the descriptor of the sensor
   }
   
   ~CommonSensorClass()
@@ -89,20 +106,20 @@ public:
   // The begin() function starts the I2C with Wire.begin().
   // From now on the pins are claimed for the I2C bus.
   void begin(
-    int deviceAddress,             // The 7-bit I2C address of the sensor.
+    int deviceAddress,               // The 7-bit I2C address of the sensor.
     uint32_t sensorDescriptor = CSC_REGISTER_ADDRESS_SIZE_1)  // A bitwise combination of the CSC defines.
   {
-    Wire.begin();                  // Assuming it is allowed to call Wire.begin() multiple times.
+    _WireLib.begin();                   // Assuming it is allowed to call Wire.begin() multiple times.
   
     _device_address = (uint8_t) deviceAddress;
-    _descriptor = sensorDescriptor;
+    _descriptor = sensorDescriptor;  // Store the desciptor, no error checking yet.
   }
 
 
   // The pins for the I2C bus are released.
   void end()
   {
-    Wire.end();
+    _WireLib.end();
     _descriptor = 0;
   }
 
@@ -122,48 +139,75 @@ public:
     }
     
     const uint8_t *ptr = (const uint8_t*) &t;
-  
-    Wire.beginTransmission( _device_address);
+    bool success = true;           // default true, make it false if something fails later on.
 
-    if( (_descriptor & CSC_NO_REGISTER_ADDRESS) != 0)
+    unsigned int totalSize = (unsigned int) sizeof( T);
+
+    // Test if the I2C action has to be done without data.
+    if( size == 0)
     {
-      // the sensor has no register address
+      totalSize = 0;
     }
-    else if( (_descriptor & CSC_REGISTER_ADDRESS_SIZE_1) != 0)
+    else
     {
-      Wire.write( (uint8_t) registerAddress);
-    }
-    else if( (_descriptor & CSC_REGISTER_ADDRESS_SIZE_2) != 0)
-    {
-      if( (_descriptor & CSC_SENSOR_LSB_FIRST) != 0)
+      // Test if the size was used as the number of bytes and data is a pointer
+      if( totalSize == 1)
       {
-        // Is there a sensor with the register address LSB first ?
-        Wire.write( (uint8_t) registerAddress);
-        Wire.write( (uint8_t) (registerAddress >> 8));
-      }
-      else
-      {
-        // MSB is written first for most sensors.
-        Wire.write( (uint8_t) (registerAddress >> 8));
-        Wire.write( (uint8_t) registerAddress);
+        totalSize = size;
       }
     }
 
-    if( size > 0)
-    {
-      if( size > (int) sizeof( T))
-      {
-        Wire.write( ptr, (size_t) size);
-      }
-      else
-      {
-        Wire.write( ptr, (size_t) sizeof( T));
-      }
-    }
-
-    uint8_t error = Wire.endTransmission( I2Cstop);     // send true for a stop, false for repeated start.
+    // If more data needs to be transmitted, then split it into seperate parts.
+    // Increase the registerAddress for each part.
+    // It is allowed to do one I2C bus transaction without data.
     
-    return( error == 0);              // return true if success, that means true if no error.
+    do
+    {
+      unsigned int bytesToWrite = min( COMMONSENSORCLASS_WIRE_BUFFER_SIZE, totalSize);
+  
+      _WireLib.beginTransmission( _device_address);
+
+      if( (_descriptor & CSC_NO_REGISTER_ADDRESS) != 0)
+      {
+        // the sensor has no register address
+      }
+      else if( (_descriptor & CSC_REGISTER_ADDRESS_SIZE_1) != 0)
+      {
+        _WireLib.write( (uint8_t) registerAddress);
+      }
+      else if( (_descriptor & CSC_REGISTER_ADDRESS_SIZE_2) != 0)
+      {
+        if( (_descriptor & CSC_SENSOR_LSB_FIRST) != 0)
+        {
+          // Is there a sensor with the register address LSB first ?
+          _WireLib.write( (uint8_t) registerAddress);
+          _WireLib.write( (uint8_t) (registerAddress >> 8));
+        }
+        else
+        {
+          // MSB is written first for most sensors.
+          _WireLib.write( (uint8_t) (registerAddress >> 8));
+          _WireLib.write( (uint8_t) registerAddress);
+        }
+      }
+
+      if( bytesToWrite > 0)
+      {
+        _WireLib.write( ptr, (size_t) bytesToWrite);
+      }
+
+      uint8_t error = _WireLib.endTransmission( I2Cstop);     // send true for a stop, false for repeated start.
+      if( error != 0)
+      {
+        success = false;                      // Some kind of I2C bus error, stop sending data.
+      }
+
+      totalSize -= bytesToWrite;
+      registerAddress += bytesToWrite;
+    }
+    while( totalSize > 0 && success);
+    
+    return( success);              // return true if success, that means true if no error.
   }
 
   template <typename T, size_t N> bool put( uint16_t registerAddress, const T (&t)[N])
@@ -198,7 +242,7 @@ public:
   //    for the amount of bytes to transfer.
   template <typename T> bool get( uint16_t registerAddress, T (&t), size_t size = 1)
   {
-    if( _descriptor == 0)         // safety check if .begin() was not called.
+    if( _descriptor == 0)                  // safety check if .begin() was not called.
     {
       return( false);
     }
@@ -206,130 +250,165 @@ public:
     uint8_t *ptr = (uint8_t *) &t;
     bool success = true;           // default true, make it false if something fails later on.
 
-    int stepSize = size;
-    uint16_t totalSize = sizeof( T);
+    unsigned int totalSize = (unsigned int) sizeof( T);
+    unsigned int bytesPerElement = (unsigned int) size;
 
-    // Test if the sensor has 3-byte values that needs to be stored in 4-bytes variables.
-    if( (_descriptor & CSC_24BIT != 0) && totalSize > 3)
-    {
-      stepSize = 4;
-    }
-
+    // Test if the 'size' was used as the number of bytes and data is a pointer
     if( totalSize == 1)
     {
-      // The 'baseSize' was used as the number of bytes and data is a pointer
       totalSize = size;
-      stepSize = 1;
-      size = 1;
+      bytesPerElement = 1;
     }
 
     // Test if the sensor uses a register address.
     // Some sensors (like the BH1750) don't have a register address in the sensor.
-    if( (_descriptor & CSC_NO_REGISTER_ADDRESS) != 0)
+    if( (_descriptor & CSC_NO_REGISTER_ADDRESS) == 0)           // the bit for no register address is not active ?
     {
       success = put( registerAddress, NULL, 0);
     }
 
     if( success)
     {
-      uint16_t n = (uint16_t) Wire.requestFrom( _device_address, totalSize);
-      if( n == totalSize)
+      // If more data is requested than the buffer size of the used Wire library,
+      // then split the request into seperate parts.
+      // This is no need to write the register address, 
+      // the Wire.requestFrom() is called multiple times.
+      do
       {
-        // The right amount of bytes have been received, 
-        // That means that valid received bytes are in the buffer.
-        // Therefor it is no need to test every Wire.read for -1.
-        
-        // MSB is often the first byte in a sensor.
-        // However, the Arduino AVR family has the LSB at the lowest memory location.
-        // It is therefor not possible to copy the data directly into the variable.
-        // By shifting the bytes into their place, the compiler takes automatically
-        // care of the right MSB-LSB order.
-        //
-        // The baseSize is needed, because if 12 bytes would be requested it could
-        // be 3 sets of 4 bytes or 4 sets of 3 bytes or 6 sets of 2 bytes, and so on.
+        unsigned int bytesToRead = min( COMMONSENSORCLASS_WIRE_BUFFER_SIZE, totalSize);
 
-        for( unsigned int i=0; i<(totalSize / stepSize); i++)
+        uint16_t n = (uint16_t) _WireLib.requestFrom( _device_address, bytesToRead);
+        if( n == bytesToRead)
         {
-          switch( size)
+          // The right amount of bytes have been received, 
+          // That means that valid received bytes are in the buffer.
+          // Therefor it is no need to test every Wire.read for -1.
+          
+          // MSB is often the first byte in a sensor.
+          // However, the Arduino AVR family has the LSB at the lowest memory location.
+          // It is therefor not possible to copy the data directly into the variable.
+          // By shifting the bytes into their place, the compiler takes automatically
+          // care of the right MSB-LSB order.
+          //
+          // The baseSize is needed, because if 12 bytes would be requested it could
+          // be 3 sets of 4 bytes or 4 sets of 3 bytes or 6 sets of 2 bytes, and so on.
+
+          for( unsigned int i=0; i<(totalSize / bytesPerElement); i++)
           {
-          case 0:
-            break;
-          case 1:
-            *ptr++ = (uint8_t) Wire.read();
-            break;
-          case 2:
-            {                     // allow local variables with extra brackets
-              uint16_t data16 = 0;
-              if( (_descriptor & CSC_SENSOR_LSB_FIRST) == 0)
+            switch( bytesPerElement)
+            {
+            case 0:
+              break;
+            case 1:
+              *ptr++ = (uint8_t) _WireLib.read();
+              break;
+            case 2:
+              {                     // allow local variables with extra brackets
+                uint16_t data16 = 0;
+                if( (_descriptor & CSC_SENSOR_LSB_FIRST) == 0)
+                {
+                  // MSB first, this is normal
+                  data16 = uint16_t( _WireLib.read()) << 8;
+                  data16 |= _WireLib.read();
+                }
+                else
+                {
+                  // LSB first, this is not normal, but some sensors have LSB first.
+                  data16 = _WireLib.read();
+                  data16 |= uint16_t( _WireLib.read()) << 8;
+                }
+                uint16_t *p = (uint16_t *) ptr;
+                *p = data16;
+                ptr += 2;
+              }
+              break;
+            case 4:
+              // The data needs to be stored into 4 bytes.
+              // Test if the sensor has 3-byte values that needs to be stored in 4-bytes variables.
+              if( (_descriptor & CSC_24BIT_SIGNED) != 0 && totalSize > 3)
               {
-                // MSB first, this is normal
-                data16 = uint16_t( Wire.read()) << 8;
-                data16 |= Wire.read();
+                uint32_t data3x8 = 0;
+                if( (_descriptor & CSC_SENSOR_LSB_FIRST) == 0)
+                {
+                  // MSB first, this is normal
+                  data3x8 = uint32_t( _WireLib.read()) << 16;
+                  data3x8 |= uint32_t( _WireLib.read()) << 8;
+                  data3x8 |= _WireLib.read();
+                }
+                else
+                {
+                  // LSB first, this is not normal, but some sensors have LSB first.
+                  data3x8 = _WireLib.read();
+                  data3x8 |= uint32_t( _WireLib.read()) << 8;
+                  data3x8 |= uint32_t( _WireLib.read()) << 16;
+                }
+
+                // extend sign to the MSB byte.
+                if( (data3x8 & 0x00800000) != 0)
+                {
+                  data3x8 |= 0xFF000000;
+                }
+
+                uint32_t *p = (uint32_t *) ptr;
+                *p = data3x8;
+                ptr += 4;
+              }
+              else if( (_descriptor & CSC_24BIT_UNSIGNED) != 0 && totalSize > 3)
+              {
+                uint32_t data3x8 = 0;
+                if( (_descriptor & CSC_SENSOR_LSB_FIRST) == 0)
+                {
+                  // MSB first, this is normal
+                  data3x8 = uint32_t( _WireLib.read()) << 16;
+                  data3x8 |= uint32_t( _WireLib.read()) << 8;
+                  data3x8 |= _WireLib.read();
+                }
+                else
+                {
+                  // LSB first, this is not normal, but some sensors have LSB first.
+                  data3x8 = _WireLib.read();
+                  data3x8 |= uint32_t( _WireLib.read()) << 8;
+                  data3x8 |= uint32_t( _WireLib.read()) << 16;
+                }
+                uint32_t *p = (uint32_t *) ptr;
+                *p = data3x8;
+                ptr += 4;
               }
               else
               {
-                // LSB first, this is not normal, but some sensors have LSB first.
-                data16 = Wire.read();
-                data16 |= uint16_t( Wire.read()) << 8;
+                uint32_t data32 = 0;
+                if( (_descriptor & CSC_SENSOR_LSB_FIRST) == 0)
+                {
+                  // MSB first, this is normal
+                  data32 = uint32_t( _WireLib.read()) << 24;
+                  data32 |= uint32_t( _WireLib.read()) << 16;
+                  data32 |= uint32_t( _WireLib.read()) << 8;
+                  data32 |= _WireLib.read();
+                }
+                else
+                {
+                  // LSB first, this is not normal, but some sensors have LSB first.
+                  data32 = _WireLib.read();
+                  data32 |= uint32_t( _WireLib.read()) << 8;
+                  data32 |= uint32_t( _WireLib.read()) << 16;
+                  data32 |= uint32_t( _WireLib.read()) << 24;
+                }
+                uint32_t *p = (uint32_t *) ptr;
+                *p = data32;
+                ptr += 4;
               }
-              uint16_t *p = (uint16_t *) ptr;
-              *p = data16;
-              ptr += 2;
+              break;
             }
-            break;
-          case 3:
-            {                     // allow local variables with extra brackets
-              uint32_t data3x8 = 0;
-              if( (_descriptor & CSC_SENSOR_LSB_FIRST) == 0)
-              {
-                // MSB first, this is normal
-                data3x8 = uint32_t( Wire.read()) << 16;
-                data3x8 |= uint32_t( Wire.read()) << 8;
-                data3x8 |= Wire.read();
-              }
-              else
-              {
-                // LSB first, this is not normal, but some sensors have LSB first.
-                data3x8 = Wire.read();
-                data3x8 |= uint32_t( Wire.read()) << 8;
-                data3x8 |= uint32_t( Wire.read()) << 16;
-              }
-              uint32_t *p = (uint32_t *) ptr;
-              *p = data3x8;
-              ptr += 4;
-            }
-            break;
-          case 4:
-            {                     // allow local variables with extra brackets
-              uint32_t data32 = 0;
-              if( (_descriptor & CSC_SENSOR_LSB_FIRST) == 0)
-              {
-                // MSB first, this is normal
-                data32 = uint32_t( Wire.read()) << 24;
-                data32 |= uint32_t( Wire.read()) << 16;
-                data32 |= uint32_t( Wire.read()) << 8;
-                data32 |= Wire.read();
-              }
-              else
-              {
-                // LSB first, this is not normal, but some sensors have LSB first.
-                data32 = Wire.read();
-                data32 |= uint32_t( Wire.read()) << 8;
-                data32 |= uint32_t( Wire.read()) << 16;
-                data32 |= uint32_t( Wire.read()) << 24;
-              }
-              uint32_t *p = (uint32_t *) ptr;
-              *p = data32;
-              ptr += 4;
-            }
-            break;
           }
+  
+          totalSize -= bytesToRead;
         }
-      }
-      else
-      {
-        success = false;
-      }
+        else
+        {
+          // The Wire.requestFrom() failed.
+          success = false;
+        }
+      } while( totalSize > 0 && success);
     }
     
     return( success);
@@ -347,8 +426,8 @@ public:
   // Some sensors are not resonding to the I2C bus when busy.
   bool exists()
   {
-    Wire.beginTransmission( _device_address);
-    uint8_t error = Wire.endTransmission();
+    _WireLib.beginTransmission( _device_address);
+    uint8_t error = _WireLib.endTransmission();
     return( error == 0);              // if error is 0, then the sensor exists and this returns true.
   }
 
@@ -388,6 +467,8 @@ public:
   }
 
 private:
+  T_WIRE_LIBRARY & _WireLib;          // The object (by template) of the used Wire library
+
   // This data describes the sensor.
   uint8_t _device_address;            // The 7-bit I2C address of the sensor. Zero is allowed.
   uint32_t _descriptor;               // Describes the sensor. Zero means not initialized yet.
