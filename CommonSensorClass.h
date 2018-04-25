@@ -46,7 +46,7 @@
 // List of reachable and unreachable goals:
 // ----------------------------------------
 //    Detect if the standard Arduino Wire library is used, and then
-//    create the CommonSensorClass automatically ?
+//    create the CommonSensorClass for that automatically ?
 //
 //    Add callback functions for non-blocking I2C libraries.
 //
@@ -57,7 +57,14 @@
 //
 //    Support other busses (SPI, 1-Wire, Serial).
 //
-//    
+//    Allow the use of multiple sensors located at different I2C busses,
+//    and those I2C busses use different kinds of Wire libraries.
+//    For example a sensor at the hardware I2C bus and another sensor at 
+//    a software I2C bus and both are caught in an array of the CommonSensorClass object.
+//
+//    Simulate an external I2C EEPROM for the AVR internal EEPROM.
+//
+//
 
 
 #include <inttypes.h>
