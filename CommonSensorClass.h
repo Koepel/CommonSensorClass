@@ -76,7 +76,7 @@
 #include <Arduino.h>
 
 
-#define COMMONSENSORCLASS_VERSION 103
+#define COMMONSENSORCLASS_VERSION 104
 
 
 // The buffer size of the used Wire library.
