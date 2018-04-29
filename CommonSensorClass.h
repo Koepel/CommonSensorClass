@@ -123,7 +123,7 @@ public:
   {
     _WireLib.begin();                // Assuming it is allowed to call Wire.begin() multiple times.
   
-    _device_address = (uint8_t) deviceAddress;
+    _device_address = deviceAddress;
     _descriptor = sensorDescriptor;  // Store the desciptor, no error checking yet.
   }
 
@@ -178,7 +178,7 @@ public:
     {
       unsigned int bytesToTransfer = min( COMMONSENSORCLASS_WIRE_BUFFER_SIZE, totalSize);
 
-      _WireLib.beginTransmission( _device_address);
+      _WireLib.beginTransmission( (uint8_t) _device_address);
 
       if( (_descriptor & CSC_NO_REGISTER_ADDRESS) != 0)
       {
@@ -344,7 +344,7 @@ public:
       {
         unsigned int bytesToTransfer = min( COMMONSENSORCLASS_WIRE_BUFFER_SIZE, totalSize);
 
-        uint16_t n = (uint16_t) _WireLib.requestFrom( _device_address, bytesToTransfer);
+        uint16_t n = (uint16_t) _WireLib.requestFrom( (uint8_t) _device_address, bytesToTransfer);
         if( n == bytesToTransfer)
         {
           // The right amount of bytes have been received, 
@@ -524,7 +524,7 @@ public:
   // Some sensors are not resonding to the I2C bus when busy.
   bool exists()
   {
-    _WireLib.beginTransmission( _device_address);
+    _WireLib.beginTransmission( (uint8_t) _device_address);
     uint8_t error = _WireLib.endTransmission();
     return( error == 0);              // if error is 0, then the sensor exists and this returns true.
   }
@@ -565,11 +565,11 @@ public:
   }
 
 private:
-  T_WIRE_LIBRARY & _WireLib;          // The object (by template) of the used Wire library
+  T_WIRE_LIBRARY & _WireLib;      // The object (by template) of the used Wire library
 
   // This data describes the sensor.
-  uint8_t _device_address;            // The 7-bit I2C address of the sensor. Zero is allowed.
-  uint32_t _descriptor;               // Describes the sensor. Zero means not initialized yet.
+  int _device_address;            // The 7-bit (or 10-bit ?) I2C address of the sensor. Zero is allowed.
+  uint32_t _descriptor;           // Describes the sensor. Zero means not initialized yet.
 };
 
 #endif
