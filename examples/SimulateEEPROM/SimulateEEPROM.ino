@@ -28,7 +28,7 @@ void setup()
   SERIAL_PORT.println( "CommonSensorClass + SimEE");
   SERIAL_PORT.println( "-------------------------");
 
-  simmy.begin( 0x10, CSC_REGISTER_ADDRESS_SIZE_2); // Define the sensor.
+  simmy.begin( 0x10, CSC_REGISTER_ADDRESS_SIZE_2); // Define the sensor and use I2C address 0x10.
 
   if( !simmy.exists())           // Check if sensor exists on the I2C bus.
   {
@@ -36,12 +36,12 @@ void setup()
   }
 
   const int dataOut[10] = { 10, 20, 30, 40, 100, 1000, 10000, -1, -200, -4000};
-  simmy.put( 0x10, dataOut);
+  simmy.put( 100, dataOut);        // store it at location 100
 
 
   SERIAL_PORT.print( "Read data via CommonSensorClass = ");
   int dataIn[10];
-  simmy.get( 0x10, dataIn);
+  simmy.get( 100, dataIn);         // retrieve the data from location 100
 
 
   for( int i=0; i<10; i++)
