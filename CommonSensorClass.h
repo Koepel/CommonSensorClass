@@ -31,7 +31,13 @@
 // Added external I2C EEPROM simulation (by using the internal EEPROM).
 // The CommonSensorClass could be halfway to become useful.
 //
+// Version 1.05   2018 mei 13     by Koepel
+// Set repeated start as default.
+// Clip size to transfer to a multiple of the element size.
+// Using size_t for size to allow any size.
+// Slowly getting there.
 //
+// 
 //
 // Other existing libraries for a common class.
 // ---------------------------------------------------------------------------------
@@ -68,6 +74,10 @@
 //    a software I2C bus and both are caught in an array of the CommonSensorClass object.
 //
 //    Add 10-bit I2C address.
+//    That is probably not possible with the Wire library.
+//
+//    Some kind of sign bit extend for signed data less than 16 bytes.
+//
 //
 //
 
@@ -76,7 +86,7 @@
 #include <Arduino.h>
 
 
-#define COMMONSENSORCLASS_VERSION 104
+#define COMMONSENSORCLASS_VERSION 105
 
 
 // The buffer size of the used Wire library.
@@ -92,7 +102,7 @@
 #define CSC_NO_REGISTER_ADDRESS       0x00000001  // The sensor has no register address.
 #define CSC_REGISTER_ADDRESS_SIZE_1   0x00000002  // The sensor register address is one byte.
 #define CSC_REGISTER_ADDRESS_SIZE_2   0x00000004  // The sensor register address is two bytes.
-#define CSC_REPEATED_START            0x00000010  // The sensor requires/supports a repeated start.
+#define CSC_NO_REPEATED_START         0x00000010  // The sensor does not allow a repeated start.
 #define CSC_24BIT_SIGNED              0x00000020  // The sensor has 24-bit signed data.
 #define CSC_24BIT_UNSIGNED            0x00000040  // The sensor has 24-bit unsigned data;
 #define CSC_SENSOR_LSB_FIRST          0x00000080  // The sensor has the register address and data as LSB first.
@@ -106,7 +116,7 @@ public:
   // It does not change anything to the pins for I2C yet.
   // The constructure uses the object of the used Wire library.
   // The "_WireLib" is the object stored in this template.
-  CommonSensorClass( T_WIRE_LIBRARY& WireLibrary): _WireLib( WireLibrary)
+  CommonSensorClass( T_WIRE_LIBRARY & WireLibrary): _WireLib( WireLibrary)
   {
     _descriptor = 0;                 // reset the descriptor of the sensor
   }
@@ -153,8 +163,8 @@ public:
     const uint8_t *ptr = (const uint8_t*) &t;
     bool success = true;           // default true, make it false if something fails later on.
 
-    unsigned int totalSize = (unsigned int) sizeof( T);
-    unsigned int bytesPerElement = (unsigned int) size;
+    size_t totalSize = sizeof( T);
+    size_t bytesPerElement = size;
 
     // Test if the I2C action has to be done without data.
     if( size == 0)
@@ -167,6 +177,7 @@ public:
       if( totalSize == 1)
       {
         totalSize = size;
+        bytesPerElement = 1;
       }
     }
 
@@ -176,7 +187,15 @@ public:
     
     do
     {
-      unsigned int bytesToTransfer = min( COMMONSENSORCLASS_WIRE_BUFFER_SIZE, totalSize);
+      size_t bytesToTransfer = min( COMMONSENSORCLASS_WIRE_BUFFER_SIZE, totalSize);
+      
+      // Clip the bytes to transfer to a multiple of the element size.
+      // This is not a problem for the AVR Wire library which has a buffer of 32 bytes,
+      // but the TinyWire has only 18 bytes and the ATSAM has 255 bytes.
+      if( elementSize > 1)
+      {
+        bytesToTransfer = (bytesToTransfer / elementSize) * elementSize;
+      }
 
       _WireLib.beginTransmission( (uint8_t) _device_address);
 
@@ -206,7 +225,7 @@ public:
 
       if( bytesToTransfer > 0)
       {
-        for( unsigned int i=0; i<(totalSize / bytesPerElement); i++)
+        for( size_t i=0; i<(totalSize / bytesPerElement); i++)
         {
           switch( bytesPerElement)
           {
@@ -317,8 +336,8 @@ public:
     uint8_t *ptr = (uint8_t *) &t;
     bool success = true;           // default true, make it false if something fails later on.
 
-    unsigned int totalSize = (unsigned int) sizeof( T);
-    unsigned int bytesPerElement = (unsigned int) size;
+    size_t totalSize = sizeof( T);
+    size_t bytesPerElement = size;
 
     // Test if the 'size' was used as the number of bytes and data is a pointer
     if( totalSize == 1)
@@ -331,7 +350,9 @@ public:
     // Some sensors (like the BH1750) don't have a register address in the sensor.
     if( (_descriptor & CSC_NO_REGISTER_ADDRESS) == 0)           // the bit for no register address is not active ?
     {
-      success = put( registerAddress, NULL, 0);
+      // A repeated start after setting the register address is the default.
+      bool stopI2C = (_description & CSC_NO_REPEATED_START) == 0;
+      success = put( registerAddress, NULL, stopI2C);
     }
 
     if( success)
@@ -342,9 +363,17 @@ public:
       // the Wire.requestFrom() is called multiple times.
       do
       {
-        unsigned int bytesToTransfer = min( COMMONSENSORCLASS_WIRE_BUFFER_SIZE, totalSize);
+        size_t bytesToTransfer = min( COMMONSENSORCLASS_WIRE_BUFFER_SIZE, totalSize);
 
-        uint16_t n = (uint16_t) _WireLib.requestFrom( (uint8_t) _device_address, bytesToTransfer);
+        // Clip the bytes to transfer to a multiple of the element size.
+        // This is not a problem for the AVR Wire library which has a buffer of 32 bytes,
+        // but the TinyWire has only 18 bytes and the ATSAM has 255 bytes.
+        if( elementSize > 1)
+        {
+          bytesToTransfer = (bytesToTransfer / elementSize) * elementSize;
+        }
+        
+        size_t n = (size_t) _WireLib.requestFrom( (uint8_t) _device_address, bytesToTransfer);
         if( n == bytesToTransfer)
         {
           // The right amount of bytes have been received, 
@@ -360,7 +389,7 @@ public:
           // The baseSize is needed, because if 12 bytes would be requested it could
           // be 3 sets of 4 bytes or 4 sets of 3 bytes or 6 sets of 2 bytes, and so on.
 
-          for( unsigned int i=0; i<(totalSize / bytesPerElement); i++)
+          for( size_t i=0; i<(totalSize / bytesPerElement); i++)
           {
             switch( bytesPerElement)
             {
@@ -565,7 +594,7 @@ public:
   }
 
 private:
-  T_WIRE_LIBRARY & _WireLib;      // The object (by template) of the used Wire library
+  T_WIRE_LIBRARY & _WireLib;      // The object by reference (from template) of the used Wire library
 
   // This data describes the sensor.
   int _device_address;            // The 7-bit (or 10-bit ?) I2C address of the sensor. Zero is allowed.
