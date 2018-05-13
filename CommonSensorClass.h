@@ -78,7 +78,7 @@
 //    Add 10-bit I2C address.
 //    That is probably not possible with the Wire library.
 //
-//    Some kind of sign bit extend for signed data less than 16 bytes.
+//    Some kind of sign bit extend for signed data less than 16 bits.
 //
 //
 //
