@@ -58,6 +58,8 @@
 // ----------------------------------------
 //    Detect if the standard Arduino Wire library is used, and then
 //    create the CommonSensorClass for that automatically ?
+//    Other Wire library could be detected from defines,
+//    perhaps create automatically the object ?
 //
 //    Add callback functions for non-blocking I2C libraries.
 //
