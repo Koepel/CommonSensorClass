@@ -41,9 +41,10 @@
 //
 // Other existing libraries for a common class.
 // ---------------------------------------------------------------------------------
-//    I could not find an existing library like this one.
-//    Other common sensor libraries are more specific.
+//    Other common sensor libraries are often more specific.
 //    This library is not specific and has auto MSB-LSB order for variables.
+//    At 2018 may 14, I found: https://github.com/brianc118/Team-PI-Lib/tree/master/i2cAnything
+//    At that moment, my own library had already passed that point.
 //
 //
 // This library could provide a quick start to build upon.
