@@ -13,4 +13,6 @@ sensor.get( 0x3B, accel);
 This will read 6 bytes of data from register address 0x3B and up. The MSB and LSB of each variable is automatically stored in the right location.  
 The variable type should match the sensor. If the sensor has 16-bits signed integers, then 16-bits signed integers should be read.
 
+This library is only for the sensor. When a Wire or Wire-compatible library has to be set to certain pins or at a certain speed, that has to be done before the CommonSensorClass is used.
+
 In the future the SPI bus might be added. The CommonSensorClass can use other ways to communicate. The first step for this is a simulated external I2C EEPROM, which is rerouted to the internal EEPROM. See the SimulateEEPROM example.
