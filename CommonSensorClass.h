@@ -31,11 +31,14 @@
 // Added external I2C EEPROM simulation (by using the internal EEPROM).
 // The CommonSensorClass could be halfway to become useful.
 //
-// Version 1.05   2018 mei 13     by Koepel
+// Version 1.05   2018 may 13     by Koepel
 // Set repeated start as default.
 // Clip size to transfer to a multiple of the element size.
 // Using size_t for size to allow any size.
 // Slowly getting there.
+//
+// Version 1.06   2018 may 21     by Koepel
+// Added all the readS16, writeU16, readU8, writeU32 functions.
 //
 // 
 //
@@ -89,7 +92,7 @@
 #include <Arduino.h>
 
 
-#define COMMONSENSORCLASS_VERSION 105
+#define COMMONSENSORCLASS_VERSION 106
 
 
 // The buffer size of the used Wire library.
@@ -582,7 +585,6 @@ public:
     get( registerAddress, *pData, size);
   }
 
-
   // This function is called writeByte(), to avoid confusion with Wire.write().
   // A complete I2C transaction is used to write a single byte.
   // No error is returned yet.
@@ -594,6 +596,78 @@ public:
   void writeBytes( uint16_t registerAddress, uint8_t *pData, int size)
   {
     put( registerAddress, *pData, size);
+  }
+  
+  uint8_t readU8( uint16_t registerAddress)
+  {
+    uint8_t data;
+    get( registerAddress, data);
+    return( data);
+  }
+
+  int8_t readS8( uint16_t registerAddress)
+  {
+    int8_t data;
+    get( registerAddress, data);
+    return( data);
+  }
+
+  uint16_t readU16( uint16_t registerAddress)
+  {
+    uint16_t data;
+    get( registerAddress, data);
+    return( data);
+  }
+
+  int16_t readS16( uint16_t registerAddress)
+  {
+    int16_t data;
+    get( registerAddress, data);
+    return( data);
+  }
+
+  uint32_t readU32( uint16_t registerAddress)
+  {
+    uint32_t data;
+    get( registerAddress, data);
+    return( data);
+  }
+
+  int32_t readS32( uint16_t registerAddress)
+  {
+    int32_t data;
+    get( registerAddress, data);
+    return( data);
+  }
+  
+  void writeU8( uint16_t registerAddress, uint8_t data)
+  {
+    put( registerAddress, data);
+  }
+
+  void writeS8( uint16_t registerAddress, int8_t data)
+  {
+    put( registerAddress, data);
+  }
+
+  void writeU16( uint16_t registerAddress, uint16_t data)
+  {
+    put( registerAddress, data);
+  }
+
+  void writeS16( uint16_t registerAddress, int16_t data)
+  {
+    put( registerAddress, data);
+  }
+
+  void writeU32( uint16_t registerAddress, uint32_t data)
+  {
+    put( registerAddress, data);
+  }
+
+  void writeS32( uint16_t registerAddress, int32_t data)
+  {
+    put( registerAddress, data);
   }
 
 private:
