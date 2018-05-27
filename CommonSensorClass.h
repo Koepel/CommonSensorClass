@@ -84,6 +84,8 @@
 //
 //    Some kind of sign bit extend for signed data less than 16 bits.
 //
+//    Add a function to read a single bit from a register from the sensor.
+//      For example readBit( registerAddress, bit 0..7) which returns 0 or 1.
 //
 //
 
