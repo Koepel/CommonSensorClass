@@ -67,8 +67,12 @@
 //
 //    Add callback functions for non-blocking I2C libraries.
 //
-//    Add the possibility of a delay or timeout or poll the sensor for sensors 
-//    that require some time for a new sample.
+//    Add the possibility to set a delay or timeout or poll the sensor.
+//    Some sensors require some time for a new sample.
+//    Sometimes that is a few microseconds, but sometimes more than a second.
+//    Sometimes it is between writing the register address and reading data,
+//    but sometimes before writing the register address.
+//    This will be hard to implement, because there are too many ways for the delay.
 //
 //    Make Slave code that works well with this class.
 //
