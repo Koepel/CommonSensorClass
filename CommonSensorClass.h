@@ -151,6 +151,8 @@ public:
   
     _device_address = deviceAddress;
     _descriptor = sensorDescriptor;  // Store the desciptor, no error checking yet.
+    
+    _errorCount = 0;                 // clear the common error count
   }
 
 
