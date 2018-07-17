@@ -40,7 +40,11 @@
 // Version 1.06   2018 may 21     by Koepel
 // Added all the readS16, writeU16, readU8, writeU32 functions.
 //
-// 
+// Version 1.07   2018 june 17    by Koepel
+// Added error count.
+//
+//
+//
 //
 // Other existing libraries for a common class.
 // ---------------------------------------------------------------------------------
@@ -297,6 +301,7 @@ public:
       if( error != 0)
       {
         success = false;                      // Some kind of I2C bus error, stop sending data.
+        _errorCount++;                        // increase the common error count
       }
 
       totalSize -= bytesToTransfer;
@@ -547,6 +552,7 @@ public:
         {
           // The Wire.requestFrom() failed.
           success = false;
+          _errorCount++;        // increase the common error count
         }
       } while( totalSize > 0 && success);
     }
@@ -676,12 +682,23 @@ public:
     put( registerAddress, data);
   }
 
+  uint16_t getErrorCount()
+  {
+    return( _errorCount);
+  }
+  
+  void clearErrorCount()
+  {
+    _errorCount = 0;
+  }
+
 private:
   T_WIRE_LIBRARY & _WireLib;      // The object by reference (from template) of the used Wire library
 
   // This data describes the sensor.
   int _device_address;            // The 7-bit (or 10-bit ?) I2C address of the sensor. Zero is allowed.
   uint32_t _descriptor;           // Describes the sensor. Zero means not initialized yet.
+  uint16_t _errorCount;           // A two-byte integer should be enough. One error per day is already too much.
 };
 
 #endif
