@@ -111,9 +111,10 @@
 
 // The buffer size of the used Wire library.
 // The size is 32 for the Arduino AVR microcontrollers.
-// It is less for the TinyWire and more for the Arduino SAMD processors.
-// This should be set automatically to the right value, 
-// but there is no way to get that number from the used Wire library.
+// It is less for the TinyWire and more for the Arduino Wire library
+// for SAMD processors.
+// This could be set automatically. 
+// Not tested yet if the .availableForWrite() works for the Arduino Wire library.
 #define COMMONSENSORCLASS_WIRE_BUFFER_SIZE 32
 
 
