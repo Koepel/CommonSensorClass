@@ -46,12 +46,16 @@
 //
 //
 //
-// Other existing libraries for a common class.
-// ---------------------------------------------------------------------------------
+// Other libraries for a common class.
+// -----------------------------------
 //    Other common sensor libraries are often more specific.
-//    This library is not specific and has auto MSB-LSB order for variables.
+//    This CommonSensorClass library is not specific and has auto MSB-LSB order for variables.
 //    At 2018 may 14, I found: https://github.com/brianc118/Team-PI-Lib/tree/master/i2cAnything
-//    At that moment, my own library had already passed that point.
+//      At that moment, my own library had already passed that point.
+//    In March 2019, Adafruit started the Adafruit_BusIO abstraction library.
+//      https://github.com/adafruit/Adafruit_BusIO
+//      It is designed for SPI and I2C (The CommonSensorClass has only I2C at this moment).
+//      It uses the same principle to put the details of a sensor in a object.
 //
 //
 // This library could provide a quick start to build upon.
