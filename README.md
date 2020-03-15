@@ -16,3 +16,5 @@ The variable type should match the sensor. If the sensor has 16-bits signed inte
 This library is only for the sensor. When a Wire or Wire-compatible library has to be set to certain pins or at a certain speed, that has to be done before the CommonSensorClass is used.
 
 In the future the SPI bus might be added. The CommonSensorClass can use other ways to communicate. The first step for this is a simulated external I2C EEPROM, which is rerouted to the internal EEPROM. See the SimulateEEPROM example.
+
+To do: I might add this check: https://forum.arduino.cc/index.php?topic=670763.msg4514930#msg4514930 but only when SDA and SCL are defined.
