@@ -18,3 +18,7 @@ This library is only for the sensor. When a Wire or Wire-compatible library has 
 In the future the SPI bus might be added. The CommonSensorClass can use other ways to communicate. The first step for this is a simulated external I2C EEPROM, which is rerouted to the internal EEPROM. See the SimulateEEPROM example.
 
 To do: I might add this check: https://forum.arduino.cc/index.php?topic=670763.msg4514930#msg4514930 but only when SDA and SCL are defined.
+
+### 2021 : Status of this code
+
+Trying to get every sensor working with this code is not possible. Trying to get most sensors working with this code is already ugly. A wrapper with functions that use a pointer to the data needs more code in the sketch to convert the data. Consider this project on hold.
