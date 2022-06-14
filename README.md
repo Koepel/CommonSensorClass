@@ -19,6 +19,6 @@ In the future the SPI bus might be added. The CommonSensorClass can use other wa
 
 To do: I might add this check: https://forum.arduino.cc/index.php?topic=670763.msg4514930#msg4514930 but only when SDA and SCL are defined.
 
-### 2021 : Status of this code
+### 2022 : Status of this code
 
-Trying to get every sensor working with this code is not possible. Trying to get most sensors working with this code is already ugly. A wrapper with functions that use a pointer to the data needs more code in the sketch to convert the data. Consider this project on hold.
+Trying to get every sensor working with this code is not possible. Trying to get most sensors working with this code is already ugly. Just a simple wrapper similar to the EEPROM.get() and EEPROM.put() seems the best option. Automatically generate multiple sessions when the data is larger than the buffer of the Wire library is hard, it might not be reliable for every situation. 
