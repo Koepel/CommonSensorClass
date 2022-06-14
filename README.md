@@ -21,4 +21,5 @@ To do: I might add this check: https://forum.arduino.cc/index.php?topic=670763.m
 
 ### 2022 : Status of this code
 
-Trying to get every sensor working with this code is not possible. Trying to get most sensors working with this code is already ugly. Just a simple wrapper similar to the EEPROM.get() and EEPROM.put() seems the best option. Automatically generate multiple sessions when the data is larger than the buffer of the Wire library is hard, it might not be reliable for every situation. 
+Trying to get every sensor working with this code is not possible. Trying to get most sensors working with this code is already ugly. Just a simple wrapper similar to the EEPROM.get() and EEPROM.put() seems the best option. Automatically generate multiple sessions when the data is larger than the buffer of the Wire library is hard, it might not be reliable for every situation.
+This project is on hold for now.
