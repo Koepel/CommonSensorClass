@@ -1,6 +1,10 @@
 # CommonSensorClass
 A wrapper around the Wire library for easier interfacing sensors.
 
+### 2023 : Not a good idea
+It turns out that it is not possible to make a "common" class for every sensor. I might remove most of it and keep only the basic interface with .put() and .get(), similar to the EEPROM.put() and EEPROM.get().
+
+<hr>
 
 The library consists of just one file: CommonSensorClass.h  
 At this moment it is just an idea. There might be bugs in it and the parameters for .put() and .get() could change.
@@ -18,8 +22,3 @@ This library is only for the sensor. When a Wire or Wire-compatible library has 
 In the future the SPI bus might be added. The CommonSensorClass can use other ways to communicate. The first step for this is a simulated external I2C EEPROM, which is rerouted to the internal EEPROM. See the SimulateEEPROM example.
 
 To do: I might add this check: https://forum.arduino.cc/index.php?topic=670763.msg4514930#msg4514930 but only when SDA and SCL are defined.
-
-### 2022 : Status of this code
-
-Trying to get every sensor working with this code is not possible. Trying to get most sensors working with this code is already ugly. Just a simple wrapper similar to the EEPROM.get() and EEPROM.put() seems the best option. Automatically generate multiple sessions when the data is larger than the buffer of the Wire library is hard, it might not be reliable for every situation.
-This project is on hold for now.
